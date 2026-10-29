@@ -1,0 +1,208 @@
+{
+  "status": "local_acceptance_passed",
+  "date": "2026-10-29",
+  "started_at": "2026-10-29T01:41:22.5473385Z",
+  "finished_at": "2026-10-29T01:53:34.6726095Z",
+  "source_version": "0.1.0",
+  "source_commit": null,
+  "ci_verified": false,
+  "deployment_verified": false,
+  "release_gates": [
+    {
+      "name": "node-prerequisite",
+      "status": "passed",
+      "seconds": 0.09
+    },
+    {
+      "name": "docker-prerequisite",
+      "status": "passed",
+      "seconds": 0.42
+    },
+    {
+      "name": "source-bootstrap",
+      "status": "passed",
+      "seconds": 60.93
+    },
+    {
+      "name": "php-format",
+      "status": "passed",
+      "seconds": 8.61
+    },
+    {
+      "name": "source-php-lock",
+      "status": "passed",
+      "seconds": 2.05
+    },
+    {
+      "name": "prepare-clean-snapshot",
+      "status": "passed",
+      "seconds": 0.45
+    },
+    {
+      "name": "javascript-clean-install",
+      "status": "passed",
+      "seconds": 22.02
+    },
+    {
+      "name": "frontend-and-contracts",
+      "status": "passed",
+      "seconds": 16.4
+    },
+    {
+      "name": "simulator-contracts",
+      "status": "passed",
+      "seconds": 0.27
+    },
+    {
+      "name": "javascript-audit",
+      "status": "passed",
+      "seconds": 4.39
+    },
+    {
+      "name": "compose-configuration",
+      "status": "passed",
+      "seconds": 0.29
+    },
+    {
+      "name": "container-builds",
+      "status": "passed",
+      "seconds": 6.32
+    },
+    {
+      "name": "php-clean-install",
+      "status": "passed",
+      "seconds": 223.11
+    },
+    {
+      "name": "php-format-and-syntax",
+      "status": "passed",
+      "seconds": 13.23
+    },
+    {
+      "name": "php-audit",
+      "status": "passed",
+      "seconds": 2.07
+    },
+    {
+      "name": "stack-start-and-health",
+      "status": "passed",
+      "seconds": 31.59
+    },
+    {
+      "name": "sqlite-regression",
+      "status": "passed",
+      "seconds": 39.36
+    },
+    {
+      "name": "postgres-regression",
+      "status": "passed",
+      "seconds": 40.49
+    },
+    {
+      "name": "browser-install",
+      "status": "passed",
+      "seconds": 3.43
+    },
+    {
+      "name": "browser-ui-and-mobile",
+      "status": "passed",
+      "seconds": 8.86
+    },
+    {
+      "name": "live-browser-and-security",
+      "status": "passed",
+      "seconds": 52.87
+    },
+    {
+      "name": "faults-backup-retention-load",
+      "status": "passed",
+      "seconds": 189.23
+    }
+  ],
+  "test_results": {
+    "php_sqlite": {
+      "tests": 32,
+      "assertions": 145,
+      "notices": 3
+    },
+    "php_postgres": {
+      "tests": 32,
+      "assertions": 145,
+      "notices": 3
+    },
+    "contracts": 4,
+    "runtime_http_client": 8,
+    "simulator": 8,
+    "ui_mobile": 8,
+    "live_integration": 4
+  },
+  "machine": {
+    "platform": "win32",
+    "release": "10.0.26200",
+    "arch": "x64",
+    "cpu_model": "11th Gen Intel(R) Core(TM) i5-11400F @ 2.60GHz",
+    "cpu_threads": 12,
+    "host_memory_bytes": 17009455104,
+    "node": "v24.15.0"
+  },
+  "runtime_checks": [
+    {
+      "name": "broker-loss-recovers-database-intent",
+      "status": "passed",
+      "seconds": 63.552,
+      "details": {
+        "event_id": "01a18559-e524-7000-93f4-fe7e968e33a9",
+        "delivery_id": "01a18559-e52f-7200-af41-58c8f0e59888",
+        "attempts": 1
+      }
+    },
+    {
+      "name": "killed-worker-preserves-uncertainty",
+      "status": "passed",
+      "seconds": 62.33,
+      "details": {
+        "delivery_id": "01a1855a-d2e6-7139-9853-edf622242742",
+        "attempts": 2,
+        "uncertain_recorded": true
+      }
+    },
+    {
+      "name": "database-backup-and-restore",
+      "status": "passed",
+      "seconds": 31.252,
+      "details": {
+        "persisted_events": 8,
+        "sentinel_removed": true,
+        "encrypted_records_readable": true
+      }
+    },
+    {
+      "name": "payload-retention-preserves-history",
+      "status": "passed",
+      "seconds": 1.03,
+      "details": {
+        "event_id": "01a1855a-d2dc-7106-954e-2d2c9eca0ce7",
+        "payload_removed": true,
+        "delivery_history_retained": true
+      }
+    },
+    {
+      "name": "measured-ingress-and-queue-baseline",
+      "status": "passed",
+      "seconds": 30.4,
+      "details": {
+        "accepted": 30,
+        "delivered": 30,
+        "ingress_rate": 1,
+        "ingress_p95_ms": 70.57,
+        "queue_drain_seconds": 0.109,
+        "methodology": "30 synthetic events at 1 event/second, one worker; provisional sanity threshold"
+      }
+    }
+  ],
+  "limitations": [
+    "30 synthetic events at one event per second is a sanity baseline, not a maximum capacity measurement.",
+    "Hosted CI and public deployment were not run.",
+    "PHPUnit reported three notices per database suite without failures or errors."
+  ]
+}

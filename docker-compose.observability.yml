@@ -1,0 +1,33 @@
+services:
+ observability-config:
+  image: node:24-alpine
+  command: ["node","-e","const fs=require('fs');const t=fs.readFileSync('/template/prometheus.yml','utf8');fs.writeFileSync('/config/prometheus.yml',t.replace('METRICS_TOKEN_PLACEHOLDER',process.env.METRICS_TOKEN));"]
+  environment:
+   METRICS_TOKEN: ${METRICS_TOKEN:?Generate METRICS_TOKEN before starting observability}
+  volumes:
+   - ./infrastructure/monitoring/prometheus.yml:/template/prometheus.yml:ro
+   - prometheus-config:/config
+  profiles: [observability]
+ prometheus:
+  image: prom/prometheus:v3.5.0
+  command: ["--config.file=/etc/prometheus/prometheus.yml"]
+  volumes: [prometheus-config:/etc/prometheus:ro]
+  ports: ["127.0.0.1:9094:9090"]
+  networks: [egress]
+  depends_on:
+   observability-config: {condition: service_completed_successfully}
+  profiles: [observability]
+ grafana:
+  image: grafana/grafana:12.1.0
+  ports: ["127.0.0.1:3004:3000"]
+  environment:
+   GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:?Generate a private GRAFANA_PASSWORD for the optional profile}
+   GF_USERS_ALLOW_SIGN_UP: "false"
+  networks: [egress]
+  volumes:
+   - grafana-data:/var/lib/grafana
+   - ./infrastructure/monitoring/datasource.yml:/etc/grafana/provisioning/datasources/apiqendra.yml:ro
+  profiles: [observability]
+volumes:
+ prometheus-config: {}
+ grafana-data: {}

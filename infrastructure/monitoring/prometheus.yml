@@ -1,0 +1,9 @@
+global:
+ scrape_interval: 15s
+scrape_configs:
+ - job_name: apiqendra
+   metrics_path: /internal/metrics
+   authorization:
+    type: Bearer
+    credentials: METRICS_TOKEN_PLACEHOLDER
+   static_configs: [{targets: ['api:8000']}]

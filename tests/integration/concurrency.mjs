@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
+import { signWebhook } from '../../packages/contracts/signing.mjs';
+const endpoint=process.env.ENDPOINT_URL,secret=process.env.WEBHOOK_SECRET;
+if(!endpoint||!secret)throw new Error('Set ENDPOINT_URL and WEBHOOK_SECRET for an active synthetic endpoint.');
+const id=randomUUID(),timestamp=Math.floor(Date.now()/1000),body=JSON.stringify({id,type:'issue.opened',data:{issue:{title:'Concurrent duplicate fixture'},repository:{name:'security/test'}}});
+const headers={'Content-Type':'application/json','X-Event-ID':id,'X-Apiqendra-Timestamp':String(timestamp),'X-Apiqendra-Signature':signWebhook(body,secret,timestamp)};
+const replies=await Promise.all(Array.from({length:10},async()=>{const r=await fetch(endpoint,{method:'POST',headers,body});return {status:r.status,...await r.json()};}));
+assert.equal(replies.filter(r=>r.status===202).length,1);
+assert.equal(replies.filter(r=>r.status===200&&r.duplicate).length,9);
+assert.equal(new Set(replies.map(r=>r.event_id)).size,1);
+console.log('10 concurrent requests: 1 acceptance, 9 deduplicated acknowledgments, 1 event ID.');

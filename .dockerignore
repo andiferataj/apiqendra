@@ -1,0 +1,10 @@
+.git
+**/node_modules
+**/vendor
+**/.env
+.env
+.runtime
+**/dist
+**/test-results
+**/playwright-report
+*.log

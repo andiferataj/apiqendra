@@ -1,0 +1,91 @@
+name: quality
+on: [push, pull_request, workflow_dispatch]
+permissions:
+ contents: read
+jobs:
+ windows-scripts:
+  runs-on: windows-latest
+  steps:
+   - uses: actions/checkout@v4
+   - uses: actions/setup-node@v4
+     with: {node-version: '24'}
+   - name: Windows PowerShell 5.1 native command handling
+     shell: powershell
+     run: ./tests/scripts/native.test.ps1
+   - name: PowerShell 7 native command handling
+     shell: pwsh
+     run: ./tests/scripts/native.test.ps1
+ frontend:
+  runs-on: ubuntu-latest
+  steps:
+   - uses: actions/checkout@v4
+   - uses: actions/setup-node@v4
+     with: {node-version: '24', cache: npm, cache-dependency-path: '**/package-lock.json'}
+   - run: npm ci
+   - run: npm --prefix apps/web ci
+   - run: npm run check
+   - run: node --test apps/simulators/server.test.mjs
+   - run: npx playwright install --with-deps chromium
+   - run: npm run test:e2e -- --project=ui --project=mobile
+   - run: npm audit --omit=dev --audit-level=high
+   - run: npm --prefix apps/web audit --omit=dev --audit-level=high
+   - uses: actions/upload-artifact@v4
+     if: always()
+     with: {name: browser-report, path: playwright-report, retention-days: 7}
+ backend:
+  runs-on: ubuntu-latest
+  strategy:
+   matrix: {database: [sqlite, pgsql]}
+  services:
+   postgres:
+    image: postgres:17-alpine
+    env: {POSTGRES_DB: apiqendra_test, POSTGRES_USER: apiqendra, POSTGRES_PASSWORD: synthetic-ci-password}
+    ports: ['5432:5432']
+    options: --health-cmd "pg_isready -U apiqendra -d apiqendra_test" --health-interval 5s --health-timeout 5s --health-retries 10
+   redis:
+    image: redis:7.4-alpine
+    ports: ['6379:6379']
+    options: --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 5s --health-retries 10
+  defaults:
+   run: {working-directory: apps/api}
+  env:
+   APP_ENV: testing
+   APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+   DB_CONNECTION: ${{ matrix.database }}
+   DB_DATABASE: ${{ matrix.database == 'sqlite' && ':memory:' || 'apiqendra_test' }}
+   DB_HOST: 127.0.0.1
+   DB_USERNAME: apiqendra
+   DB_PASSWORD: synthetic-ci-password
+   REDIS_HOST: 127.0.0.1
+   CACHE_STORE: array
+   SESSION_DRIVER: array
+   QUEUE_CONNECTION: sync
+  steps:
+   - uses: actions/checkout@v4
+   - uses: shivammathur/setup-php@v2
+     with: {php-version: '8.4', extensions: 'pdo_pgsql, pdo_sqlite, mbstring, curl, intl', tools: composer:v2, coverage: none}
+   - run: test -f composer.lock
+   - run: mkdir -p storage/framework/{cache/data,sessions,views} storage/logs bootstrap/cache
+   - run: composer validate --strict
+   - run: composer install --no-interaction --prefer-dist
+   - run: find app bootstrap config database routes tests -name '*.php' -print0 | xargs -0 -n1 php -l
+   - run: vendor/bin/pint --test
+   - run: vendor/bin/phpunit --testdox
+   - run: composer audit
+ compose:
+  runs-on: ubuntu-latest
+  timeout-minutes: 30
+  steps:
+   - uses: actions/checkout@v4
+   - uses: actions/setup-node@v4
+     with: {node-version: '24'}
+   - run: pwsh -File infrastructure/scripts/Release.ps1 -NoSourceChanges
+   - uses: actions/upload-artifact@v4
+     if: always()
+     with:
+      name: release-acceptance
+      path: |
+       .runtime/release-checks/
+       .runtime/verification/**/.runtime/release-acceptance.json
+      include-hidden-files: true
+      retention-days: 7

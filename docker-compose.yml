@@ -1,0 +1,124 @@
+name: ${COMPOSE_PROJECT_NAME:-apiqendra}
+x-api: &api
+ build:
+  context: .
+  dockerfile: infrastructure/docker/api.Dockerfile
+ image: ${API_IMAGE:-apiqendra-api:local}
+ env_file: .env
+ init: true
+ restart: unless-stopped
+ read_only: true
+ tmpfs:
+  - /tmp
+  - /var/www/html/storage:uid=1000,gid=1000,mode=0770
+  - /var/www/html/bootstrap/cache:uid=1000,gid=1000,mode=0770
+ security_opt: [no-new-privileges:true]
+ cap_drop: [ALL]
+ networks: [data,egress]
+ depends_on:
+  postgres: {condition: service_healthy}
+  redis: {condition: service_healthy}
+services:
+ postgres:
+  image: postgres:17-alpine
+  environment:
+   POSTGRES_DB: ${DB_DATABASE:-apiqendra}
+   POSTGRES_USER: ${DB_USERNAME:-apiqendra}
+   POSTGRES_PASSWORD: ${DB_PASSWORD:?Run infrastructure/scripts/Setup.ps1}
+  volumes: [postgres-data:/var/lib/postgresql/data]
+  networks: [data]
+  restart: unless-stopped
+  healthcheck:
+   test: ["CMD-SHELL","pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+   interval: 5s
+   timeout: 3s
+   retries: 20
+ redis:
+  image: redis:7.4-alpine
+  command: ["redis-server","--appendonly","yes","--maxmemory-policy","noeviction","--requirepass","${REDIS_PASSWORD:?Generate secrets with Setup.ps1}"]
+  environment:
+   REDISCLI_AUTH: ${REDIS_PASSWORD}
+  volumes: [redis-data:/data]
+  networks: [data]
+  restart: unless-stopped
+  healthcheck:
+   test: ["CMD","redis-cli","ping"]
+   interval: 5s
+   timeout: 3s
+   retries: 20
+ migrate:
+  <<: *api
+  restart: "no"
+  read_only: false
+  command: ["sh","-c","mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs storage/app/private && php artisan migrate --force && php artisan db:seed --force"]
+ api:
+  <<: *api
+  command: ["sh","-c","mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs storage/app/private && php artisan serve --host=0.0.0.0 --port=8000 --no-reload"]
+  depends_on:
+   migrate: {condition: service_completed_successfully}
+  healthcheck:
+   test: ["CMD","php","-r","exit(@file_get_contents('http://127.0.0.1:8000/health/ready') === false ? 1 : 0);"]
+   interval: 10s
+   timeout: 5s
+   retries: 15
+ worker:
+  <<: *api
+  command: ["sh","-c","mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs && php artisan queue:work redis --queue=deliveries --sleep=1 --tries=1 --timeout=15 --max-time=3600"]
+  depends_on:
+   migrate: {condition: service_completed_successfully}
+ dispatcher:
+  <<: *api
+  command: ["sh","-c","mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs && php artisan relay:dispatch --loop"]
+  depends_on:
+   migrate: {condition: service_completed_successfully}
+ scheduler:
+  <<: *api
+  command: ["sh","-c","mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs && php artisan schedule:work"]
+  depends_on:
+   migrate: {condition: service_completed_successfully}
+ web:
+  build:
+   context: .
+   dockerfile: infrastructure/docker/web.Dockerfile
+  ports: ["127.0.0.1:${HTTP_PORT:-8084}:80"]
+  depends_on:
+   api: {condition: service_healthy}
+  networks: [egress]
+  restart: unless-stopped
+  healthcheck:
+   test: ["CMD","wget","-q","--spider","http://127.0.0.1/"]
+   interval: 10s
+   timeout: 3s
+   retries: 10
+ simulator:
+  image: node:24-alpine
+  command: ["node","/app/server.mjs"]
+  volumes: [./apps/simulators:/app:ro]
+  environment:
+   DEMO_SIMULATOR_TOKEN: ${DEMO_SIMULATOR_TOKEN}
+  networks: [egress]
+  read_only: true
+  security_opt: [no-new-privileges:true]
+  cap_drop: [ALL]
+  restart: unless-stopped
+  healthcheck:
+   test: ["CMD","node","-e","fetch('http://127.0.0.1:8090/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+   interval: 5s
+   timeout: 3s
+   retries: 10
+ tooling:
+  profiles: [tools]
+  build:
+   context: .
+   dockerfile: infrastructure/docker/api.Dockerfile
+   target: tooling
+  working_dir: /var/www/html
+  volumes: [./apps/api:/var/www/html]
+  env_file: .env
+  networks: [data,egress]
+networks:
+ data: {internal: true}
+ egress: {}
+volumes:
+ postgres-data: {}
+ redis-data: {}
